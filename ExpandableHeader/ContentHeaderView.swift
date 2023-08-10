@@ -8,11 +8,21 @@
 import UIKit
 
 class ContentHeaderView: UIView {
-    private static let headerHeight: CGFloat = 100
+    
+    private static let contentHeight: CGFloat = 100
     private static let tabBarHeight: CGFloat = 44
     
+    // Position at which blur effect begins taking effect
+    private static let blurEffectThresholdHeight: CGFloat = preferredHeight
+    // Position at which blur effect reaches full effect
+    private static let blurEffectFullHeight: CGFloat = preferredHeight + 100
+    // Position at which overlay effect begins taking effect
+    private static let overlayEffectThresholdHeight: CGFloat = minHeight + 35
+    // Position at which overlay effect reaches full effect
+    private static let overlayEffectFullHeight: CGFloat = minHeight
+    
     static let minHeight: CGFloat = tabBarHeight
-    static let preferredHeight: CGFloat = headerHeight + tabBarHeight
+    static let preferredHeight: CGFloat = contentHeight + tabBarHeight
     
     private let backgroundImageView: UIImageView = {
         let view = UIImageView(image: UIImage(named: "polka_dots"))
@@ -92,16 +102,14 @@ class ContentHeaderView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        // Account for additonal top inset since header may extend beyond the safe area
-        let minHeight = self.safeAreaInsets.top + Self.minHeight
-        let preferredHeight = self.safeAreaInsets.top + Self.preferredHeight
-        
-        // TODO: Define the significance of 364
-        let blurFraction = (self.bounds.height - preferredHeight) / (364 - preferredHeight)
+        let blurEffectThresholdHeight = self.safeAreaInsets.top + Self.blurEffectThresholdHeight
+        let blurEffectCompleteHeight = self.safeAreaInsets.top + Self.blurEffectFullHeight
+        let blurFraction = (self.bounds.height - blurEffectThresholdHeight) / (blurEffectCompleteHeight - blurEffectThresholdHeight)
         self.blurView.alpha = min(max(blurFraction, 0), 1)
         
-        // TODO: Define the significance of 50
-        let overlayFraction = (preferredHeight - 50 - self.bounds.height) / (preferredHeight - 50 - minHeight)
+        let overlayEffectCompleteHeight: CGFloat = self.safeAreaInsets.top + Self.overlayEffectFullHeight
+        let overlayEffectThresholdHeight: CGFloat = self.safeAreaInsets.top + Self.overlayEffectThresholdHeight
+        let overlayFraction = 1 - (self.bounds.height - overlayEffectCompleteHeight) / (overlayEffectThresholdHeight - overlayEffectCompleteHeight)
         self.overlayView.alpha = min(max(overlayFraction, 0), 1)
     }
     
