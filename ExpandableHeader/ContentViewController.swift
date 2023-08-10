@@ -9,6 +9,9 @@ import UIKit
 
 class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
+    private static let phonyHeaderMinHeight: CGFloat = ContentHeaderView.minHeight
+    private static let phonyHeaderMaxHeight: CGFloat = ContentHeaderView.preferredHeight
+    
     private var minHeaderHeight: CGFloat = 0
     private var prevContentOffset1: CGFloat = 0
     private var prevContentOffset2: CGFloat = 0
@@ -53,7 +56,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         return tableView
     }()
     
-    private var headerHeight: CGFloat {
+    private var phonyHeaderHeight: CGFloat {
         self.phonyHeaderHeightConstraint!.constant
     }
     
@@ -88,25 +91,29 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         self.overrideUserInterfaceStyle = .light
         self.title = "Content"
         
+        self.navigationController?.navigationBar.barStyle = .default
+        self.setNavBar(isTransparent: true)
         self.view.addSubview(self.phonyHeaderView)
         self.view.addSubview(self.contentHeaderView)
         
+        // Note that phony header view accounts for top safe area
         self.phonyHeaderView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             self.phonyHeaderView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            self.phonyHeaderView.topAnchor.constraint(equalTo: self.view.topAnchor),
+            self.phonyHeaderView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
             self.phonyHeaderView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
         ])
-        self.phonyHeaderHeightConstraint = self.phonyHeaderView.heightAnchor.constraint(equalToConstant: ContentHeaderView.preferredHeight)
+        self.phonyHeaderHeightConstraint = self.phonyHeaderView.heightAnchor.constraint(equalToConstant: Self.phonyHeaderMaxHeight)
         self.phonyHeaderHeightConstraint?.isActive = true
         
+        // Note that content header view may extend beyond the top safe area
         self.contentHeaderView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             self.contentHeaderView.leadingAnchor.constraint(equalTo: self.phonyHeaderView.leadingAnchor),
-            self.contentHeaderView.topAnchor.constraint(equalTo: self.phonyHeaderView.topAnchor),
+            self.contentHeaderView.topAnchor.constraint(equalTo: self.view.topAnchor),
             self.contentHeaderView.trailingAnchor.constraint(equalTo: self.phonyHeaderView.trailingAnchor)
         ])
-        self.contentHeaderHeightConstraint = self.contentHeaderView.heightAnchor.constraint(equalTo: self.phonyHeaderView.heightAnchor)
+        self.contentHeaderHeightConstraint = self.contentHeaderView.bottomAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor)
         self.contentHeaderHeightConstraint?.isActive = true
         
         self.currentTableView = self.tableView1
@@ -114,7 +121,6 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        self.minHeaderHeight = self.view.safeAreaInsets.top + ContentHeaderView.minHeight
     }
     
     // MARK: UITableViewDataSource
@@ -170,19 +176,31 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     // MARK: Helpers
     
     private func handleScrollViewDidScroll(_ scrollView: UIScrollView, prevContentOffset: CGFloat) -> CGFloat? {
-        let offsetDiff = scrollView.contentOffset.y - prevContentOffset
         
-        if scrollView.contentOffset.y < 0 && self.headerHeight == ContentHeaderView.preferredHeight {
-            self.contentHeaderHeightConstraint?.constant = abs(scrollView.contentOffset.y)
-            scrollView.verticalScrollIndicatorInsets.top = abs(scrollView.contentOffset.y)
-        } else {
-            self.contentHeaderHeightConstraint?.constant = 0
-            scrollView.verticalScrollIndicatorInsets.top = 0
+        defer {
+            
+            // Stretch content header view beyond preferred height
+            if scrollView.contentOffset.y < 0 && self.phonyHeaderHeight == Self.phonyHeaderMaxHeight {
+                self.contentHeaderHeightConstraint?.constant = abs(scrollView.contentOffset.y)
+                scrollView.verticalScrollIndicatorInsets.top = abs(scrollView.contentOffset.y)
+            } else {
+                self.contentHeaderHeightConstraint?.constant = 0
+                scrollView.verticalScrollIndicatorInsets.top = 0
+            }
+            
+            // Update nav bar appearance
+            if self.phonyHeaderHeight == Self.phonyHeaderMinHeight {
+                self.setNavBar(isTransparent: false)
+            } else {
+                self.setNavBar(isTransparent: true)
+            }
         }
         
+        let offsetDiff = scrollView.contentOffset.y - prevContentOffset
+        
         // If scrolling up and header is not collapsed, collapse the header only
-        if offsetDiff > 0 && self.headerHeight > self.minHeaderHeight {
-            self.phonyHeaderHeightConstraint!.constant = max(self.minHeaderHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
+        if offsetDiff > 0 && self.phonyHeaderHeight > Self.phonyHeaderMinHeight {
+            self.phonyHeaderHeightConstraint!.constant = max(Self.phonyHeaderMinHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
             scrollView.contentOffset.y = prevContentOffset
             return nil
             
@@ -190,7 +208,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         
         // If scrolling down and scroll view is at top of content, expand header only
         if offsetDiff < 0 && scrollView.contentOffset.y < 0 {
-            self.phonyHeaderHeightConstraint!.constant = min(ContentHeaderView.preferredHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
+            self.phonyHeaderHeightConstraint!.constant = min(Self.phonyHeaderMaxHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
             return nil
         }
         
@@ -214,6 +232,29 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
             tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ])
+    }
+    
+    private func setNavBar(isTransparent: Bool) {
+        if isTransparent {
+            let appearance = UINavigationBarAppearance()
+            // TODO: Should we use configureWithTransparentBackground()
+            appearance.configureWithOpaqueBackground()
+            appearance.shadowColor = .clear
+            appearance.backgroundColor = .clear
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+            self.navigationController?.navigationBar.standardAppearance = appearance
+            self.navigationController?.navigationBar.scrollEdgeAppearance = appearance
+            self.navigationController?.navigationBar.tintColor = .white
+        } else {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.shadowColor = .lightGray
+            appearance.backgroundColor = .white
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.black]
+            self.navigationController?.navigationBar.standardAppearance = appearance
+            self.navigationController?.navigationBar.scrollEdgeAppearance = appearance
+            self.navigationController?.navigationBar.tintColor = .black
+        }
     }
 }
 
