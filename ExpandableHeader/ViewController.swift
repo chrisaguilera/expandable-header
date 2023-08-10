@@ -12,6 +12,8 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        self.overrideUserInterfaceStyle = .light
+        
         let action = UIAction(title: "Push Content") { [weak self] _ in
             self?.navigationController?.pushViewController(ContentViewController(), animated: true)
         }

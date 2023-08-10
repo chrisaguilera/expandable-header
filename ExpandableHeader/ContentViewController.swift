@@ -7,70 +7,37 @@
 
 import UIKit
 
-class ContentHeaderView: UIView {
-    private static let headerHeight: CGFloat = 220
-    private static let tabBarHeight: CGFloat = 44
-    
-    static var minHeight: CGFloat {
-        tabBarHeight
-    }
-    
-    static var maxHeight: CGFloat {
-        headerHeight + tabBarHeight
-    }
-    
-    private let headerView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .brown
-        return view
-    }()
-    
-    private let tabBarView: UIView = {
-        let view = UIView()
-        view.backgroundColor = .red
-        return view
-    }()
-    
-    var onTapTab: (() -> Void)?
-    
-    init() {
-        super.init(frame: .zero)
-        
-        self.addSubview(self.headerView)
-        self.addSubview(self.tabBarView)
-        
-        self.headerView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            self.headerView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
-            self.headerView.topAnchor.constraint(equalTo: self.topAnchor),
-            self.headerView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
-        ])
-        
-        self.tabBarView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            self.tabBarView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
-            self.tabBarView.topAnchor.constraint(equalTo: self.headerView.bottomAnchor),
-            self.tabBarView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
-            self.tabBarView.bottomAnchor.constraint(equalTo: self.bottomAnchor),
-            self.tabBarView.heightAnchor.constraint(equalToConstant: Self.tabBarHeight)
-        ])
-        
-        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.handleTapTabBar))
-        self.tabBarView.addGestureRecognizer(tapGestureRecognizer)
-    }
-    
-    required init?(coder: NSCoder) {
-        return nil
-    }
-    
-    @objc private func handleTapTabBar() {
-        self.onTapTab?()
-    }
-}
-
 class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
     
-    private let headerView: UIView
+    private var minHeaderHeight: CGFloat = 0
+    private var prevContentOffset1: CGFloat = 0
+    private var prevContentOffset2: CGFloat = 0
+    private var didDragTableView2 = false
+    private var phonyHeaderHeightConstraint: NSLayoutConstraint?
+    private var contentHeaderHeightConstraint: NSLayoutConstraint?
+    private var currentTableView: UITableView? {
+        willSet {
+            self.currentTableView?.removeFromSuperview()
+        }
+        didSet {
+            guard let currentTableView else { return }
+            self.setupTableView(currentTableView)
+        }
+    }
+    
+    // Defines the fixed position of the header view. Used for layout.
+    private let phonyHeaderView: UIView = {
+        return UIView()
+    }()
+    
+    // References the actual header view. This view should contain the actual content to display.
+    // Its leading, top and trailing anchors are fixed to the phony header view. Its height is fixed
+    // to the height of the phony header view, plus some constant. In the case where the user drags
+    // beyond top content (content offset is negative), the height of this view grows to fill the
+    // empty space.
+    private let contentHeaderView = {
+        return ContentHeaderView()
+    }()
     
     private let tableView1: UITableView = {
         let tableView = UITableView()
@@ -86,41 +53,30 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         return tableView
     }()
     
-    private var minHeaderHeight: CGFloat = 0
-    private var prevContentOffset1: CGFloat = 0
-    private var prevContentOffset2: CGFloat = 0
-    private var headerHeightConstraint: NSLayoutConstraint?
-    private var currentTableView: UITableView? {
-        willSet {
-            self.currentTableView?.removeFromSuperview()
-        }
-        didSet {
-            guard let currentTableView else { return }
-            self.setupTableView(currentTableView)
-        }
-    }
-    
     private var headerHeight: CGFloat {
-        self.headerHeightConstraint!.constant
+        self.phonyHeaderHeightConstraint!.constant
     }
     
     init() {
-        self.headerView = ContentHeaderView()
         super.init(nibName: nil, bundle: nil)
         
         self.tableView1.delegate = self
         self.tableView1.dataSource = self
         self.tableView1.rowHeight = 80
         self.tableView1.estimatedRowHeight = 80
+        // Disable automatic adjustments of scroll indicator to remove additional inset added to
+        // the top of the table view
+        self.tableView1.automaticallyAdjustsScrollIndicatorInsets = false
         
         self.tableView2.delegate = self
         self.tableView2.dataSource = self
         self.tableView2.rowHeight = 80
         self.tableView2.estimatedRowHeight = 80
+        // Disable automatic adjustments of scroll indicator to remove additional inset added to
+        // the top of the table view
+        self.tableView2.automaticallyAdjustsScrollIndicatorInsets = false
         
-        (self.headerView as? ContentHeaderView)?.onTapTab = { [weak self] in
-            self?.handleTapTabBar()
-        }
+        self.contentHeaderView.onTapTab = { [weak self] in self?.handleTapTabBar() }
     }
     
     required init?(coder: NSCoder) {
@@ -129,21 +85,29 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
+        self.overrideUserInterfaceStyle = .light
         self.title = "Content"
         
-        self.view.addSubview(self.headerView)
+        self.view.addSubview(self.phonyHeaderView)
+        self.view.addSubview(self.contentHeaderView)
         
-        let layoutGuide = self.view.safeAreaLayoutGuide
-        
-        self.headerView.translatesAutoresizingMaskIntoConstraints = false
+        self.phonyHeaderView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            self.headerView.leadingAnchor.constraint(equalTo: layoutGuide.leadingAnchor),
-            self.headerView.topAnchor.constraint(equalTo: self.view.topAnchor),
-            self.headerView.trailingAnchor.constraint(equalTo: layoutGuide.trailingAnchor),
+            self.phonyHeaderView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            self.phonyHeaderView.topAnchor.constraint(equalTo: self.view.topAnchor),
+            self.phonyHeaderView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
         ])
-        self.headerHeightConstraint = self.headerView.heightAnchor.constraint(equalToConstant: ContentHeaderView.maxHeight)
-        self.headerHeightConstraint?.isActive = true
+        self.phonyHeaderHeightConstraint = self.phonyHeaderView.heightAnchor.constraint(equalToConstant: ContentHeaderView.preferredHeight)
+        self.phonyHeaderHeightConstraint?.isActive = true
+        
+        self.contentHeaderView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.contentHeaderView.leadingAnchor.constraint(equalTo: self.phonyHeaderView.leadingAnchor),
+            self.contentHeaderView.topAnchor.constraint(equalTo: self.phonyHeaderView.topAnchor),
+            self.contentHeaderView.trailingAnchor.constraint(equalTo: self.phonyHeaderView.trailingAnchor)
+        ])
+        self.contentHeaderHeightConstraint = self.contentHeaderView.heightAnchor.constraint(equalTo: self.phonyHeaderView.heightAnchor)
+        self.contentHeaderHeightConstraint?.isActive = true
         
         self.currentTableView = self.tableView1
     }
@@ -162,9 +126,9 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell()
         if tableView === self.tableView1 {
-            cell.contentView.backgroundColor = .yellow
-        } else {
             cell.contentView.backgroundColor = .green
+        } else {
+            cell.contentView.backgroundColor = .cyan
         }
         
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
@@ -187,10 +151,19 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
             if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset1) {
                 self.prevContentOffset1 = newContentOffset
             }
-        } else {
+        } else if self.didDragTableView2 {
             if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset2) {
                 self.prevContentOffset2 = newContentOffset
             }
+        }
+    }
+    
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        // Flag is required to fix an issue caused by scrollViewDidScroll being unexpectedly invoked
+        // when tableView2 is first added to the view hierarchy. Ignore scroll event handling for tableView2
+        // until the user initiates scroll.
+        if scrollView == self.tableView2 {
+            self.didDragTableView2 = true
         }
     }
     
@@ -199,15 +172,17 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     private func handleScrollViewDidScroll(_ scrollView: UIScrollView, prevContentOffset: CGFloat) -> CGFloat? {
         let offsetDiff = scrollView.contentOffset.y - prevContentOffset
         
-//        if scrollView.contentOffset.y < 0 && self.headerHeight == ContentHeaderView.maxHeight {
-//            print("STRETCH")
-//        } else {
-//            print("NO")
-//        }
+        if scrollView.contentOffset.y < 0 && self.headerHeight == ContentHeaderView.preferredHeight {
+            self.contentHeaderHeightConstraint?.constant = abs(scrollView.contentOffset.y)
+            scrollView.verticalScrollIndicatorInsets.top = abs(scrollView.contentOffset.y)
+        } else {
+            self.contentHeaderHeightConstraint?.constant = 0
+            scrollView.verticalScrollIndicatorInsets.top = 0
+        }
         
         // If scrolling up and header is not collapsed, collapse the header only
         if offsetDiff > 0 && self.headerHeight > self.minHeaderHeight {
-            self.headerHeightConstraint!.constant = max(self.minHeaderHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            self.phonyHeaderHeightConstraint!.constant = max(self.minHeaderHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
             scrollView.contentOffset.y = prevContentOffset
             return nil
             
@@ -215,13 +190,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         
         // If scrolling down and scroll view is at top of content, expand header only
         if offsetDiff < 0 && scrollView.contentOffset.y < 0 {
-            print("HUH")
-            print(scrollView.contentOffset.y)
-            print(prevContentOffset)
-            print(offsetDiff)
-            let newHeight = min(ContentHeaderView.maxHeight, self.headerHeightConstraint!.constant - offsetDiff)
-            print("new height: \(newHeight)")
-            self.headerHeightConstraint!.constant = min(ContentHeaderView.maxHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            self.phonyHeaderHeightConstraint!.constant = min(ContentHeaderView.preferredHeight, self.phonyHeaderHeightConstraint!.constant - offsetDiff)
             return nil
         }
         
@@ -237,11 +206,11 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     }
     
     private func setupTableView(_ tableView: UITableView) {
-        self.view.addSubview(tableView)
+        self.view.insertSubview(tableView, belowSubview: self.contentHeaderView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            tableView.topAnchor.constraint(equalTo: self.headerView.bottomAnchor),
+            tableView.topAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor),
             tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ])
