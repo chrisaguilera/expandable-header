@@ -20,8 +20,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         let window = UIWindow(windowScene: windowScene)
         
-        let vc = ViewController()
-        window.rootViewController = vc
+        let vc = ViewController(nibName: nil, bundle: nil)
+        let navController = UINavigationController(rootViewController: vc)
+        window.rootViewController = navController
         
         self.window = window
         window.makeKeyAndVisible()
