@@ -7,9 +7,17 @@
 
 import UIKit
 
-class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+class ContentHeaderView: UIView {
     private static let headerHeight: CGFloat = 220
     private static let tabBarHeight: CGFloat = 44
+    
+    static var minHeight: CGFloat {
+        tabBarHeight
+    }
+    
+    static var maxHeight: CGFloat {
+        headerHeight + tabBarHeight
+    }
     
     private let headerView: UIView = {
         let view = UIView()
@@ -22,6 +30,47 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         view.backgroundColor = .red
         return view
     }()
+    
+    var onTapTab: (() -> Void)?
+    
+    init() {
+        super.init(frame: .zero)
+        
+        self.addSubview(self.headerView)
+        self.addSubview(self.tabBarView)
+        
+        self.headerView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.headerView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            self.headerView.topAnchor.constraint(equalTo: self.topAnchor),
+            self.headerView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+        ])
+        
+        self.tabBarView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.tabBarView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            self.tabBarView.topAnchor.constraint(equalTo: self.headerView.bottomAnchor),
+            self.tabBarView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            self.tabBarView.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+            self.tabBarView.heightAnchor.constraint(equalToConstant: Self.tabBarHeight)
+        ])
+        
+        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.handleTapTabBar))
+        self.tabBarView.addGestureRecognizer(tapGestureRecognizer)
+    }
+    
+    required init?(coder: NSCoder) {
+        return nil
+    }
+    
+    @objc private func handleTapTabBar() {
+        self.onTapTab?()
+    }
+}
+
+class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+    
+    private let headerView: UIView
     
     private let tableView1: UITableView = {
         let tableView = UITableView()
@@ -56,6 +105,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     }
     
     init() {
+        self.headerView = ContentHeaderView()
         super.init(nibName: nil, bundle: nil)
         
         self.tableView1.delegate = self
@@ -68,8 +118,9 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         self.tableView2.rowHeight = 80
         self.tableView2.estimatedRowHeight = 80
         
-        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.handleTapTabBar))
-        self.tabBarView.addGestureRecognizer(tapGestureRecognizer)
+        (self.headerView as? ContentHeaderView)?.onTapTab = { [weak self] in
+            self?.handleTapTabBar()
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -82,7 +133,6 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         self.title = "Content"
         
         self.view.addSubview(self.headerView)
-        self.view.addSubview(self.tabBarView)
         
         let layoutGuide = self.view.safeAreaLayoutGuide
         
@@ -92,23 +142,15 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
             self.headerView.topAnchor.constraint(equalTo: self.view.topAnchor),
             self.headerView.trailingAnchor.constraint(equalTo: layoutGuide.trailingAnchor),
         ])
-        self.headerHeightConstraint = self.headerView.heightAnchor.constraint(equalToConstant: Self.headerHeight)
+        self.headerHeightConstraint = self.headerView.heightAnchor.constraint(equalToConstant: ContentHeaderView.maxHeight)
         self.headerHeightConstraint?.isActive = true
-        
-        self.tabBarView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            self.tabBarView.leadingAnchor.constraint(equalTo: layoutGuide.leadingAnchor),
-            self.tabBarView.topAnchor.constraint(equalTo: self.headerView.bottomAnchor),
-            self.tabBarView.trailingAnchor.constraint(equalTo: layoutGuide.trailingAnchor),
-            self.tabBarView.heightAnchor.constraint(equalToConstant: Self.tabBarHeight)
-        ])
         
         self.currentTableView = self.tableView1
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        self.minHeaderHeight = self.view.safeAreaInsets.top
+        self.minHeaderHeight = self.view.safeAreaInsets.top + ContentHeaderView.minHeight
     }
     
     // MARK: UITableViewDataSource
@@ -141,8 +183,6 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     // MARK: UITableViewDelegate
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        print(scrollView.contentOffset.y)
-        
         if scrollView == self.tableView1 {
             if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset1) {
                 self.prevContentOffset1 = newContentOffset
@@ -159,6 +199,12 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     private func handleScrollViewDidScroll(_ scrollView: UIScrollView, prevContentOffset: CGFloat) -> CGFloat? {
         let offsetDiff = scrollView.contentOffset.y - prevContentOffset
         
+//        if scrollView.contentOffset.y < 0 && self.headerHeight == ContentHeaderView.maxHeight {
+//            print("STRETCH")
+//        } else {
+//            print("NO")
+//        }
+        
         // If scrolling up and header is not collapsed, collapse the header only
         if offsetDiff > 0 && self.headerHeight > self.minHeaderHeight {
             self.headerHeightConstraint!.constant = max(self.minHeaderHeight, self.headerHeightConstraint!.constant - offsetDiff)
@@ -169,14 +215,20 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         
         // If scrolling down and scroll view is at top of content, expand header only
         if offsetDiff < 0 && scrollView.contentOffset.y < 0 {
-            self.headerHeightConstraint!.constant = min(Self.headerHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            print("HUH")
+            print(scrollView.contentOffset.y)
+            print(prevContentOffset)
+            print(offsetDiff)
+            let newHeight = min(ContentHeaderView.maxHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            print("new height: \(newHeight)")
+            self.headerHeightConstraint!.constant = min(ContentHeaderView.maxHeight, self.headerHeightConstraint!.constant - offsetDiff)
             return nil
         }
         
         return scrollView.contentOffset.y
     }
     
-    @objc private func handleTapTabBar() {
+    private func handleTapTabBar() {
         if let currentTableView, currentTableView == self.tableView1 {
             self.currentTableView = self.tableView2
         } else {
@@ -189,7 +241,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         tableView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            tableView.topAnchor.constraint(equalTo: self.tabBarView.bottomAnchor),
+            tableView.topAnchor.constraint(equalTo: self.headerView.bottomAnchor),
             tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ])
