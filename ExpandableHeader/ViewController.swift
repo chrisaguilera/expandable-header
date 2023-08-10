@@ -8,8 +8,8 @@
 import UIKit
 
 class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
-    private static let minHeaderHeight: CGFloat = 100
-    private static let maxHeaderHeight: CGFloat = 250
+    private static let minHeaderHeight: CGFloat = 80
+    private static let maxHeaderHeight: CGFloat = 320
     
     private let headerView: UIView = {
         let view = UIView()
@@ -31,6 +31,8 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         return tableView
     }()
     
+    private var prevContentOffset1: CGFloat = 0
+    private var prevContentOffset2: CGFloat = 0
     private var headerHeightConstraint: NSLayoutConstraint?
     private var currentTableView: UITableView? {
         willSet {
@@ -101,6 +103,7 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
         
         let label = UILabel()
+        label.textColor = .black
         label.text = String(indexPath.row)
         cell.contentView.addSubview(label)
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -113,41 +116,40 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
     // MARK: UITableViewDelegate
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        print(scrollView.contentOffset.y)
         
         if scrollView == self.tableView1 {
-            
-            let contentOffset = scrollView.contentOffset.y
-            
-            var newHeaderHeight = self.headerHeightConstraint!.constant
-            if contentOffset > 0 {
-                newHeaderHeight = max(Self.minHeaderHeight, self.headerHeightConstraint!.constant - contentOffset)
-            } else if contentOffset < 0 {
-                newHeaderHeight = min(Self.maxHeaderHeight, self.headerHeightConstraint!.constant - contentOffset)
-            }
-            
-            if newHeaderHeight != self.headerHeightConstraint!.constant {
-                self.headerHeightConstraint!.constant = newHeaderHeight
-                self.tableView1.contentOffset.y = 0
+            if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset1) {
+                self.prevContentOffset1 = newContentOffset
             }
         } else {
-            
-            let contentOffset = scrollView.contentOffset.y
-
-            var newHeaderHeight = self.headerHeightConstraint!.constant
-            if contentOffset > 0 {
-                newHeaderHeight = max(Self.minHeaderHeight, self.headerHeightConstraint!.constant - contentOffset)
-            } else if contentOffset < 0 {
-                newHeaderHeight = min(Self.maxHeaderHeight, self.headerHeightConstraint!.constant - contentOffset)
-            }
-
-            if newHeaderHeight != self.headerHeightConstraint!.constant {
-                self.headerHeightConstraint!.constant = newHeaderHeight
-                self.tableView2.contentOffset.y = 0 
+            if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset2) {
+                self.prevContentOffset2 = newContentOffset
             }
         }
     }
     
     // MARK: Helpers
+    
+    private func handleScrollViewDidScroll(_ scrollView: UIScrollView, prevContentOffset: CGFloat) -> CGFloat? {
+        let offsetDiff = scrollView.contentOffset.y - prevContentOffset
+        
+        // If scrolling up and header is not collapsed, collapse the header only
+        if offsetDiff > 0 && self.headerHeight > Self.minHeaderHeight {
+            self.headerHeightConstraint!.constant = max(Self.minHeaderHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            scrollView.contentOffset.y = prevContentOffset
+            return nil
+            
+        }
+        
+        // If scrolling down and scroll view is at top of content, expand header only
+        if offsetDiff < 0 && scrollView.contentOffset.y < 0 {
+            self.headerHeightConstraint!.constant = min(Self.maxHeaderHeight, self.headerHeightConstraint!.constant - offsetDiff)
+            return nil
+        }
+        
+        return scrollView.contentOffset.y
+    }
     
     @objc private func handleTapHeader() {
         if let currentTableView, currentTableView == self.tableView1 {
