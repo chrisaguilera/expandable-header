@@ -9,20 +9,21 @@ import UIKit
 
 class ContentHeaderView: UIView {
     
-    private static let contentHeight: CGFloat = 100
+    // Constants should not take safe area into consideration
+    private static let contentHeight: CGFloat = 60
     private static let tabBarHeight: CGFloat = 44
     
-    // Position at which blur effect begins taking effect
+    // Height at which blur effect begins taking effect
     private static let blurEffectThresholdHeight: CGFloat = preferredHeight
-    // Position at which blur effect reaches full effect
+    // Height at which blur effect reaches full effect
     private static let blurEffectFullHeight: CGFloat = preferredHeight + 100
-    // Position at which overlay effect begins taking effect
-    private static let overlayEffectThresholdHeight: CGFloat = minHeight + 35
-    // Position at which overlay effect reaches full effect
-    private static let overlayEffectFullHeight: CGFloat = minHeight
+    // Height at which opacity effect begins taking effect
+    private static let opacityEffectThresholdHeight: CGFloat = minHeight + 30
+    // Height at which opacity effect reaches full effect
+    private static let opacityEffectFullHeight: CGFloat = minHeight
     
     static let minHeight: CGFloat = tabBarHeight
-    static let preferredHeight: CGFloat = contentHeight + tabBarHeight
+    static let preferredHeight: CGFloat = tabBarHeight + contentHeight
     
     private let backgroundImageView: UIImageView = {
         let view = UIImageView(image: UIImage(named: "polka_dots"))
@@ -36,11 +37,16 @@ class ContentHeaderView: UIView {
         return UIVisualEffectView(effect: effect)
     }()
     
-    private let overlayView: UIView = {
+    private let opacityView: UIView = {
         let view = UIView()
         view.backgroundColor = .white
         view.alpha = 0
         return view
+    }()
+    
+    private lazy var button: UIButton = {
+        let action = UIAction(title: "Button") { _ in print(#function) }
+        return UIButton(configuration: .filled(), primaryAction: action)
     }()
     
     private let tabBarView: UIView = {
@@ -56,7 +62,8 @@ class ContentHeaderView: UIView {
         
         self.addSubview(self.backgroundImageView)
         self.addSubview(self.blurView)
-        self.addSubview(self.overlayView)
+        self.addSubview(self.opacityView)
+        self.addSubview(self.button)
         self.addSubview(self.tabBarView)
         
         self.backgroundImageView.translatesAutoresizingMaskIntoConstraints = false
@@ -74,12 +81,18 @@ class ContentHeaderView: UIView {
             self.blurView.bottomAnchor.constraint(equalTo: self.backgroundImageView.bottomAnchor)
         ])
         
-        self.overlayView.translatesAutoresizingMaskIntoConstraints = false
+        self.opacityView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            self.overlayView.leadingAnchor.constraint(equalTo: self.backgroundImageView.leadingAnchor),
-            self.overlayView.topAnchor.constraint(equalTo: self.backgroundImageView.topAnchor),
-            self.overlayView.trailingAnchor.constraint(equalTo: self.backgroundImageView.trailingAnchor),
-            self.overlayView.bottomAnchor.constraint(equalTo: self.backgroundImageView.bottomAnchor)
+            self.opacityView.leadingAnchor.constraint(equalTo: self.backgroundImageView.leadingAnchor),
+            self.opacityView.topAnchor.constraint(equalTo: self.backgroundImageView.topAnchor),
+            self.opacityView.trailingAnchor.constraint(equalTo: self.backgroundImageView.trailingAnchor),
+            self.opacityView.bottomAnchor.constraint(equalTo: self.backgroundImageView.bottomAnchor)
+        ])
+        
+        self.button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.button.topAnchor.constraint(equalTo: self.safeAreaLayoutGuide.topAnchor, constant: 8),
+            self.button.centerXAnchor.constraint(equalTo: self.centerXAnchor)
         ])
         
         self.tabBarView.translatesAutoresizingMaskIntoConstraints = false
@@ -102,15 +115,21 @@ class ContentHeaderView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         
+        // Apply blur effect if height is within defined range
         let blurEffectThresholdHeight = self.safeAreaInsets.top + Self.blurEffectThresholdHeight
         let blurEffectCompleteHeight = self.safeAreaInsets.top + Self.blurEffectFullHeight
         let blurFraction = (self.bounds.height - blurEffectThresholdHeight) / (blurEffectCompleteHeight - blurEffectThresholdHeight)
         self.blurView.alpha = min(max(blurFraction, 0), 1)
         
-        let overlayEffectCompleteHeight: CGFloat = self.safeAreaInsets.top + Self.overlayEffectFullHeight
-        let overlayEffectThresholdHeight: CGFloat = self.safeAreaInsets.top + Self.overlayEffectThresholdHeight
-        let overlayFraction = 1 - (self.bounds.height - overlayEffectCompleteHeight) / (overlayEffectThresholdHeight - overlayEffectCompleteHeight)
-        self.overlayView.alpha = min(max(overlayFraction, 0), 1)
+        // Apply opacity effect if height is within defined range
+        let opacityEffectCompleteHeight: CGFloat = self.safeAreaInsets.top + Self.opacityEffectFullHeight
+        let opacityEffectThresholdHeight: CGFloat = self.safeAreaInsets.top + Self.opacityEffectThresholdHeight
+        let opacityFraction = 1 - (self.bounds.height - opacityEffectCompleteHeight) / (opacityEffectThresholdHeight - opacityEffectCompleteHeight)
+        self.opacityView.alpha = min(max(opacityFraction, 0), 1)
+        
+        // Hide controls if height is smaller than preferred height (squished)
+        let preferredHeight = self.safeAreaInsets.top + Self.preferredHeight
+        self.button.isHidden = self.bounds.height < preferredHeight - 8
     }
     
     @objc private func handleTapTabBar() {

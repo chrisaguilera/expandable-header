@@ -132,9 +132,9 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell()
         if tableView === self.tableView1 {
-            cell.contentView.backgroundColor = .green
-        } else {
             cell.contentView.backgroundColor = .cyan
+        } else {
+            cell.contentView.backgroundColor = .green
         }
         
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
