@@ -17,7 +17,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     private var prevContentOffset2: CGFloat = 0
     private var didDragTableView2 = false
     private var phonyHeaderHeightConstraint: NSLayoutConstraint?
-    private var contentHeaderHeightConstraint: NSLayoutConstraint?
+    private var contentHeaderBottomConstraint: NSLayoutConstraint?
     private var currentTableView: UITableView? {
         willSet {
             self.currentTableView?.removeFromSuperview()
@@ -43,16 +43,28 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     }()
     
     private let tableView1: UITableView = {
-        let tableView = UITableView()
+        let tableView = UITableView(frame: .zero, style: .plain)
         tableView.backgroundColor = .white
         tableView.allowsSelection = false
+        tableView.rowHeight = 80
+        tableView.estimatedRowHeight = 80
+        // Disable automatic adjustments of scroll indicator to remove additional inset added to
+        // the top of the table view
+        tableView.automaticallyAdjustsScrollIndicatorInsets = false
+        tableView.sectionHeaderTopPadding = 0
         return tableView
     }()
     
     private let tableView2: UITableView = {
-        let tableView = UITableView()
+        let tableView = UITableView(frame: .zero, style: .plain)
         tableView.backgroundColor = .white
         tableView.allowsSelection = false
+        tableView.rowHeight = 80
+        tableView.estimatedRowHeight = 80
+        // Disable automatic adjustments of scroll indicator to remove additional inset added to
+        // the top of the table view
+        tableView.automaticallyAdjustsScrollIndicatorInsets = false
+        tableView.sectionHeaderTopPadding = 0
         return tableView
     }()
     
@@ -65,19 +77,9 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         
         self.tableView1.delegate = self
         self.tableView1.dataSource = self
-        self.tableView1.rowHeight = 80
-        self.tableView1.estimatedRowHeight = 80
-        // Disable automatic adjustments of scroll indicator to remove additional inset added to
-        // the top of the table view
-        self.tableView1.automaticallyAdjustsScrollIndicatorInsets = false
         
         self.tableView2.delegate = self
         self.tableView2.dataSource = self
-        self.tableView2.rowHeight = 80
-        self.tableView2.estimatedRowHeight = 80
-        // Disable automatic adjustments of scroll indicator to remove additional inset added to
-        // the top of the table view
-        self.tableView2.automaticallyAdjustsScrollIndicatorInsets = false
         
         self.contentHeaderView.onTapTab = { [weak self] in self?.handleTapTabBar() }
     }
@@ -113,8 +115,8 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
             self.contentHeaderView.topAnchor.constraint(equalTo: self.view.topAnchor),
             self.contentHeaderView.trailingAnchor.constraint(equalTo: self.phonyHeaderView.trailingAnchor)
         ])
-        self.contentHeaderHeightConstraint = self.contentHeaderView.bottomAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor)
-        self.contentHeaderHeightConstraint?.isActive = true
+        self.contentHeaderBottomConstraint = self.contentHeaderView.bottomAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor)
+        self.contentHeaderBottomConstraint?.isActive = true
         
         self.currentTableView = self.tableView1
     }
@@ -124,6 +126,14 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     }
     
     // MARK: UITableViewDataSource
+    
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        if tableView == self.tableView1 {
+            return 0
+        } else {
+            return 44
+        }
+    }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return 40
@@ -148,6 +158,16 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         label.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor).isActive = true
         
         return cell
+    }
+    
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        if tableView == self.tableView1 {
+            return nil
+        } else {
+            let view = UIView()
+            view.backgroundColor = .lightGray
+            return view
+        }
     }
     
     // MARK: UITableViewDelegate
@@ -181,10 +201,10 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
             
             // Stretch content header view beyond preferred height
             if scrollView.contentOffset.y < 0 && self.phonyHeaderHeight == Self.phonyHeaderMaxHeight {
-                self.contentHeaderHeightConstraint?.constant = abs(scrollView.contentOffset.y)
+                self.contentHeaderBottomConstraint?.constant = abs(scrollView.contentOffset.y)
                 scrollView.verticalScrollIndicatorInsets.top = abs(scrollView.contentOffset.y)
             } else {
-                self.contentHeaderHeightConstraint?.constant = 0
+                self.contentHeaderBottomConstraint?.constant = 0
                 scrollView.verticalScrollIndicatorInsets.top = 0
             }
             
