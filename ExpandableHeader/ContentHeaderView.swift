@@ -44,6 +44,10 @@ class ContentHeaderView: UIView {
         return view
     }()
     
+    private let contentContainerView: UIView = {
+        return UIView()
+    }()
+    
     private lazy var button: UIButton = {
         let action = UIAction(title: "Button") { _ in print(#function) }
         return UIButton(configuration: .filled(), primaryAction: action)
@@ -60,11 +64,18 @@ class ContentHeaderView: UIView {
     init() {
         super.init(frame: .zero)
         
+        self.contentContainerView.addSubview(self.button)
         self.addSubview(self.backgroundImageView)
         self.addSubview(self.blurView)
         self.addSubview(self.opacityView)
-        self.addSubview(self.button)
+        self.addSubview(self.contentContainerView)
         self.addSubview(self.tabBarView)
+        
+        self.button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.button.centerXAnchor.constraint(equalTo: self.contentContainerView.centerXAnchor),
+            self.button.centerYAnchor.constraint(equalTo: self.contentContainerView.centerYAnchor)
+        ])
         
         self.backgroundImageView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -89,10 +100,12 @@ class ContentHeaderView: UIView {
             self.opacityView.bottomAnchor.constraint(equalTo: self.backgroundImageView.bottomAnchor)
         ])
         
-        self.button.translatesAutoresizingMaskIntoConstraints = false
+        self.contentContainerView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            self.button.topAnchor.constraint(equalTo: self.safeAreaLayoutGuide.topAnchor, constant: 8),
-            self.button.centerXAnchor.constraint(equalTo: self.centerXAnchor)
+            self.contentContainerView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
+            self.contentContainerView.topAnchor.constraint(equalTo: self.safeAreaLayoutGuide.topAnchor),
+            self.contentContainerView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
+            self.contentContainerView.bottomAnchor.constraint(equalTo: self.backgroundImageView.bottomAnchor)
         ])
         
         self.tabBarView.translatesAutoresizingMaskIntoConstraints = false
@@ -129,7 +142,7 @@ class ContentHeaderView: UIView {
         
         // Hide controls if height is smaller than preferred height (squished)
         let preferredHeight = self.safeAreaInsets.top + Self.preferredHeight
-        self.button.isHidden = self.bounds.height < preferredHeight - 8
+        self.button.isHidden = self.bounds.height < preferredHeight - 20
     }
     
     @objc private func handleTapTabBar() {
