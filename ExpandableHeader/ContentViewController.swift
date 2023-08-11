@@ -7,7 +7,7 @@
 
 import UIKit
 
-class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+class ContentViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     
     private static let phonyHeaderMinHeight: CGFloat = ContentHeaderView.minHeight
     private static let phonyHeaderMaxHeight: CGFloat = ContentHeaderView.preferredHeight
@@ -15,16 +15,17 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     private var minHeaderHeight: CGFloat = 0
     private var prevContentOffset1: CGFloat = 0
     private var prevContentOffset2: CGFloat = 0
-    private var didDragTableView2 = false
+    private var didDragCollectionView = false
     private var phonyHeaderHeightConstraint: NSLayoutConstraint?
     private var contentHeaderBottomConstraint: NSLayoutConstraint?
-    private var currentTableView: UITableView? {
+    
+    private var currentScrollView: UIScrollView? {
         willSet {
-            self.currentTableView?.removeFromSuperview()
+            self.currentScrollView?.removeFromSuperview()
         }
         didSet {
-            guard let currentTableView else { return }
-            self.setupTableView(currentTableView)
+            guard let currentScrollView else { return }
+            self.setupScrollView(currentScrollView)
         }
     }
     
@@ -42,7 +43,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         return ContentHeaderView()
     }()
     
-    private let tableView1: UITableView = {
+    private let tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
         tableView.backgroundColor = .white
         tableView.allowsSelection = false
@@ -55,17 +56,16 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         return tableView
     }()
     
-    private let tableView2: UITableView = {
-        let tableView = UITableView(frame: .zero, style: .plain)
-        tableView.backgroundColor = .white
-        tableView.allowsSelection = false
-        tableView.rowHeight = 80
-        tableView.estimatedRowHeight = 80
-        // Disable automatic adjustments of scroll indicator to remove additional inset added to
-        // the top of the table view
-        tableView.automaticallyAdjustsScrollIndicatorInsets = false
-        tableView.sectionHeaderTopPadding = 0
-        return tableView
+    private let collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.itemSize = CGSize(width: 80, height: 80)
+        layout.headerReferenceSize = CGSize(width: 0, height: 44)
+        layout.sectionHeadersPinToVisibleBounds = true
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .white
+        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "Cell")
+        collectionView.register(UICollectionReusableView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "Header")
+        return collectionView
     }()
     
     private var phonyHeaderHeight: CGFloat {
@@ -75,11 +75,11 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     init() {
         super.init(nibName: nil, bundle: nil)
         
-        self.tableView1.delegate = self
-        self.tableView1.dataSource = self
+        self.tableView.delegate = self
+        self.tableView.dataSource = self
         
-        self.tableView2.delegate = self
-        self.tableView2.dataSource = self
+        self.collectionView.dataSource = self
+        self.collectionView.delegate = self
         
         self.contentHeaderView.onTapTab = { [weak self] in self?.handleTapTabBar() }
     }
@@ -118,7 +118,7 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         self.contentHeaderBottomConstraint = self.contentHeaderView.bottomAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor)
         self.contentHeaderBottomConstraint?.isActive = true
         
-        self.currentTableView = self.tableView1
+        self.currentScrollView = self.tableView
     }
     
     override func viewDidLayoutSubviews() {
@@ -127,25 +127,13 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     
     // MARK: UITableViewDataSource
     
-    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        if tableView == self.tableView1 {
-            return 0
-        } else {
-            return 44
-        }
-    }
-    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return 40
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell()
-        if tableView === self.tableView1 {
-            cell.contentView.backgroundColor = .cyan
-        } else {
-            cell.contentView.backgroundColor = .green
-        }
+        cell.contentView.backgroundColor = .cyan
         
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
         
@@ -160,24 +148,55 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
         return cell
     }
     
-    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        if tableView == self.tableView1 {
-            return nil
-        } else {
-            let view = UIView()
-            view.backgroundColor = .lightGray
-            return view
-        }
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return 44
     }
     
-    // MARK: UITableViewDelegate
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        let view = UIView()
+        view.backgroundColor = .lightGray
+        return view
+    }
+    
+    // MARK: UICollectionViewDataSource
+    
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return 60
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "Cell", for: indexPath)
+        cell.contentView.backgroundColor = .green
+        
+        cell.contentView.subviews.forEach { $0.removeFromSuperview() }
+        
+        let label = UILabel()
+        label.textColor = .black
+        label.text = String(indexPath.row)
+        cell.contentView.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.centerXAnchor.constraint(equalTo: cell.contentView.centerXAnchor).isActive = true
+        label.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor).isActive = true
+        
+        return cell
+    }
+    
+    // MARK: UICollectionViewDelegateFlowLayout
+    
+    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+        let header = collectionView.dequeueReusableSupplementaryView(ofKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "Header", for: indexPath)
+        header.backgroundColor = .blue
+        return header
+    }
+    
+    // MARK: UIScrollViewDelegate
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if scrollView == self.tableView1 {
+        if scrollView == self.tableView {
             if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset1) {
                 self.prevContentOffset1 = newContentOffset
             }
-        } else if self.didDragTableView2 {
+        } else if self.didDragCollectionView {
             if let newContentOffset = self.handleScrollViewDidScroll(scrollView, prevContentOffset: self.prevContentOffset2) {
                 self.prevContentOffset2 = newContentOffset
             }
@@ -186,10 +205,10 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         // Flag is required to fix an issue caused by scrollViewDidScroll being unexpectedly invoked
-        // when tableView2 is first added to the view hierarchy. Ignore scroll event handling for tableView2
-        // until the user initiates scroll.
-        if scrollView == self.tableView2 {
-            self.didDragTableView2 = true
+        // when collectionView is first added to the view hierarchy. Ignore scroll event handling for
+        // collectionView until the user initiates scroll.
+        if scrollView == self.collectionView {
+            self.didDragCollectionView = true
         }
     }
     
@@ -236,21 +255,21 @@ class ContentViewController: UIViewController, UITableViewDataSource, UITableVie
     }
     
     private func handleTapTabBar() {
-        if let currentTableView, currentTableView == self.tableView1 {
-            self.currentTableView = self.tableView2
+        if let currentScrollView, currentScrollView == self.tableView {
+            self.currentScrollView = self.collectionView
         } else {
-            self.currentTableView = self.tableView1
+            self.currentScrollView = self.tableView
         }
     }
     
-    private func setupTableView(_ tableView: UITableView) {
-        self.view.insertSubview(tableView, belowSubview: self.contentHeaderView)
-        tableView.translatesAutoresizingMaskIntoConstraints = false
+    private func setupScrollView(_ scrollView: UIScrollView) {
+        self.view.insertSubview(scrollView, belowSubview: self.contentHeaderView)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            tableView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-            tableView.topAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor),
-            tableView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+            scrollView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            scrollView.topAnchor.constraint(equalTo: self.phonyHeaderView.bottomAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ])
     }
     
