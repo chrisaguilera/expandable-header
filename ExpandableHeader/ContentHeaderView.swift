@@ -128,21 +128,18 @@ class ContentHeaderView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         
+        let height = self.bounds.height - self.safeAreaInsets.top
+        
         // Apply blur effect if height is within defined range
-        let blurEffectThresholdHeight = self.safeAreaInsets.top + Self.blurEffectThresholdHeight
-        let blurEffectCompleteHeight = self.safeAreaInsets.top + Self.blurEffectFullHeight
-        let blurFraction = (self.bounds.height - blurEffectThresholdHeight) / (blurEffectCompleteHeight - blurEffectThresholdHeight)
+        let blurFraction = (height - Self.blurEffectThresholdHeight) / (Self.blurEffectFullHeight - Self.blurEffectThresholdHeight)
         self.blurView.alpha = min(max(blurFraction, 0), 1)
         
         // Apply opacity effect if height is within defined range
-        let opacityEffectCompleteHeight: CGFloat = self.safeAreaInsets.top + Self.opacityEffectFullHeight
-        let opacityEffectThresholdHeight: CGFloat = self.safeAreaInsets.top + Self.opacityEffectThresholdHeight
-        let opacityFraction = 1 - (self.bounds.height - opacityEffectCompleteHeight) / (opacityEffectThresholdHeight - opacityEffectCompleteHeight)
+        let opacityFraction = 1 - (height - Self.opacityEffectFullHeight) / (Self.opacityEffectThresholdHeight - Self.opacityEffectFullHeight)
         self.opacityView.alpha = min(max(opacityFraction, 0), 1)
         
-        // Hide controls if height is smaller than preferred height (squished)
-        let preferredHeight = self.safeAreaInsets.top + Self.preferredHeight
-        self.button.isHidden = self.bounds.height < preferredHeight - 20
+        // Hide content if height is smaller than preferred height
+        self.contentContainerView.isHidden = height < Self.preferredHeight - 20
     }
     
     @objc private func handleTapTabBar() {
